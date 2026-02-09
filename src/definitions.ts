@@ -203,7 +203,7 @@ export interface CapacitorNfcPlugin {
    * device does not have NFC hardware.
    *
    * Use this method to determine if NFC features should be shown in your
-   * app's UI. To check if NFC is currently enabled, use {@link getStatus}.
+   * app's UI. To check if NFC is currently enabled, use `getStatus()`.
    */
   isSupported(): Promise<{ supported: boolean }>;
 

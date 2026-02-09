@@ -44,6 +44,27 @@ Remember to add the required platform configuration:
 
 ## Usage
 
+### Checking NFC hardware support
+
+Before attempting to use NFC features, you can check if the device has NFC hardware:
+
+```ts
+import { CapacitorNfc } from '@capgo/capacitor-nfc';
+
+const { supported } = await CapacitorNfc.isSupported();
+if (!supported) {
+  console.warn('This device does not have NFC hardware');
+  // Hide NFC features in your UI
+} else {
+  // Check if NFC is currently enabled
+  const { status } = await CapacitorNfc.getStatus();
+  if (status === 'NFC_DISABLED') {
+    console.warn('NFC is disabled. Prompt user to enable it.');
+    // Optionally show settings button
+  }
+}
+```
+
 ### Reading NDEF tags (default behavior)
 
 ```ts
@@ -281,7 +302,7 @@ whether NFC is currently enabled or disabled. Returns `false` if the
 device does not have NFC hardware.
 
 Use this method to determine if NFC features should be shown in your
-app's UI. To check if NFC is currently enabled, use {@link getStatus}.
+app's UI. To check if NFC is currently enabled, use `getStatus()`.
 
 **Returns:** <code>Promise&lt;{ supported: boolean; }&gt;</code>
 
