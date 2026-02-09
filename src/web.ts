@@ -55,6 +55,10 @@ export class CapacitorNfcWeb extends WebPlugin implements CapacitorNfcPlugin {
     return { version: '0.0.0-web' };
   }
 
+  async isSupported(): Promise<{ supported: boolean }> {
+    return { supported: false };
+  }
+
   addListener(eventName: 'nfcEvent', listenerFunc: (event: NfcEvent) => void): Promise<PluginListenerHandle>;
   addListener(
     eventName: 'tagDiscovered' | 'ndefDiscovered' | 'ndefMimeDiscovered' | 'ndefFormatableDiscovered',

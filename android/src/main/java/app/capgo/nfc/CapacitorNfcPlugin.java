@@ -280,6 +280,13 @@ public class CapacitorNfcPlugin extends Plugin {
         call.resolve(result);
     }
 
+    @PluginMethod
+    public void isSupported(PluginCall call) {
+        JSObject result = new JSObject();
+        result.put("supported", adapter != null);
+        call.resolve(result);
+    }
+
     private void performWrite(PluginCall call, Tag tag, NdefMessage message, boolean allowFormat) {
         executor.execute(() -> {
             Ndef ndef = Ndef.get(tag);

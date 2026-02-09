@@ -171,4 +171,14 @@ CapacitorNfc.addListener('nfcStateChange', (event) => {
   } catch (error) {
     appendLog('⚠️ Unable to read plugin version', error);
   }
+  try {
+    const { supported } = await CapacitorNfc.isSupported();
+    if (supported) {
+      appendLog('✅ NFC hardware is available on this device');
+    } else {
+      appendLog('⚠️ NFC hardware is not available on this device');
+    }
+  } catch (error) {
+    appendLog('⚠️ Unable to check NFC hardware support', error);
+  }
 })();
