@@ -125,6 +125,7 @@ await CapacitorNfc.stopScanning();
 * [`getStatus()`](#getstatus)
 * [`showSettings()`](#showsettings)
 * [`getPluginVersion()`](#getpluginversion)
+* [`isSupported()`](#issupported)
 * [`addListener('nfcEvent', ...)`](#addlistenernfcevent-)
 * [`addListener('tagDiscovered' | 'ndefDiscovered' | 'ndefMimeDiscovered' | 'ndefFormatableDiscovered', ...)`](#addlistenertagdiscovered--ndefdiscovered--ndefmimediscovered--ndefformatablediscovered-)
 * [`addListener('nfcStateChange', ...)`](#addlistenernfcstatechange-)
@@ -263,6 +264,26 @@ getPluginVersion() => Promise<{ version: string; }>
 Returns the version string baked into the native plugin.
 
 **Returns:** <code>Promise&lt;{ version: string; }&gt;</code>
+
+--------------------
+
+
+### isSupported()
+
+```typescript
+isSupported() => Promise<{ supported: boolean; }>
+```
+
+Checks whether the device has NFC hardware support.
+
+Returns `true` if NFC hardware is present on the device, regardless of
+whether NFC is currently enabled or disabled. Returns `false` if the
+device does not have NFC hardware.
+
+Use this method to determine if NFC features should be shown in your
+app's UI. To check if NFC is currently enabled, use {@link getStatus}.
+
+**Returns:** <code>Promise&lt;{ supported: boolean; }&gt;</code>
 
 --------------------
 

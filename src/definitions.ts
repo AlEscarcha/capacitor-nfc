@@ -195,6 +195,17 @@ export interface CapacitorNfcPlugin {
    * Returns the version string baked into the native plugin.
    */
   getPluginVersion(): Promise<{ version: string }>;
+  /**
+   * Checks whether the device has NFC hardware support.
+   *
+   * Returns `true` if NFC hardware is present on the device, regardless of
+   * whether NFC is currently enabled or disabled. Returns `false` if the
+   * device does not have NFC hardware.
+   *
+   * Use this method to determine if NFC features should be shown in your
+   * app's UI. To check if NFC is currently enabled, use {@link getStatus}.
+   */
+  isSupported(): Promise<{ supported: boolean }>;
 
   addListener(eventName: 'nfcEvent', listenerFunc: (event: NfcEvent) => void): Promise<PluginListenerHandle>;
   addListener(

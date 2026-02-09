@@ -18,7 +18,8 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "unshare", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getStatus", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "showSettings", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "getPluginVersion", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "getPluginVersion", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "isSupported", returnType: CAPPluginReturnPromise)
     ]
 
     private var ndefReaderSession: NFCNDEFReaderSession?
@@ -173,6 +174,18 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
         call.resolve([
             "version": pluginVersion
         ])
+    }
+
+    @objc public func isSupported(_ call: CAPPluginCall) {
+        #if targetEnvironment(simulator)
+        call.resolve([
+            "supported": false
+        ])
+        #else
+        call.resolve([
+            "supported": NFCNDEFReaderSession.readingAvailable
+        ])
+        #endif
     }
 
     private func performWrite(message: NFCNDEFMessage, on tag: NFCNDEFTag, session: NFCNDEFReaderSession, call: CAPPluginCall) {
