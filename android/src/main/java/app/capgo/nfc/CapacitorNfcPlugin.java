@@ -850,7 +850,7 @@ public class CapacitorNfcPlugin extends Plugin {
             }
 
             // Find NDEF TLV (Type = 0x03) starting after CC
-            int tlvOffset = 4; // CC is typically 4 bytes
+            int tlvOffset = (ccMagic == 0xE2) ? 8 : 4; // Extended CC (0xE2) is 8 bytes
             int ndefLength = 0;
             int ndefDataOffset = 0;
 
