@@ -4,7 +4,7 @@ import UIKit
 
 @objc(NfcPlugin)
 public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
-    private let pluginVersion: String = "8.0.13"
+    private let pluginVersion: String = "8.0.14"
 
     public let identifier = "NfcPlugin"
     public let jsName = "CapacitorNfc"
@@ -644,11 +644,14 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
 
             if error == nil && status != .notSupported {
                 // Tag supports NDEF, try to read it
-                tag.readNDEF { [weak self] message, _ in
+                tag.readNDEF { [weak self] message, readError in
                     guard let self else {
                         return
                     }
 
+                    // For blank/formatted tags that are writable but have no NDEF message yet,
+                    // readNDEF may return nil message without an error, or return an error.
+                    // We should emit the tag with its UID and writability info.
                     if message == nil {
                         // NDEF read failed, still emit tag with UID
                         self.emitTagEvent(tag: tag, status: status, capacity: capacity, message: nil, session: session)
@@ -683,8 +686,12 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
         
         tagInfo["techTypes"] = detectTechTypes(for: tag)
         tagInfo["type"] = translateType(for: tag)
-        tagInfo["isWritable"] = status == .readWrite
-        tagInfo["maxSize"] = capacity
+        
+        // Include writability and capacity information
+        if status != .notSupported {
+            tagInfo["isWritable"] = status == .readWrite
+            tagInfo["maxSize"] = capacity
+        }
 
         if let message {
             tagInfo["ndefMessage"] = message.records.map { record in
