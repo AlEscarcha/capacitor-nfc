@@ -597,6 +597,9 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
 
     /// Emit event for ISO 15693 tag
     private func emitISO15693TagEvent(tag: NFCISO15693Tag, status: NFCNDEFStatus, capacity: Int, message: NFCNDEFMessage?, session: NFCTagReaderSession) {
+        // Save the current tag for subsequent write operations
+        currentTag = tag
+
         var tagInfo: [String: Any] = [:]
 
         // Add the tag ID (UID)
