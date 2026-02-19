@@ -499,15 +499,14 @@ public class CapacitorNfcPlugin extends Plugin {
         }
 
         // For NfcV (ISO 15693 / Type 5) tags:
-        // If hasNdef is true, try to read NDEF data
-        // If hasNdef is false (raw tag), skip slow NDEF read - just use the UID
-        if (message == null && hasNfcV && hasNdef) {
+        // Always attempt raw block read since FLAG_READER_SKIP_NDEF_CHECK means
+        // hasNdef is always false, but the tag may still contain NDEF data
+        if (message == null && hasNfcV) {
             NfcV nfcV = NfcV.get(tag);
             if (nfcV != null) {
                 message = readNdefFromNfcV(nfcV, tag);
             }
         }
-        // Note: Raw NfcV tags without NDEF will still emit a tag event with UID
 
         // If no message from MIFARE or NfcV, try standard NDEF
         if (message == null) {
@@ -748,11 +747,17 @@ public class CapacitorNfcPlugin extends Plugin {
         try {
             nfcV.connect();
 
-            byte[] uid = tag.getId();
-            int blockSize = 4;
-            int numBlocks = 256;
+            byte dsfId = nfcV.getDsfId();
+            byte responseFlags = nfcV.getResponseFlags();
+            int maxTransceiveLength = nfcV.getMaxTransceiveLength();
 
-            // Try to get system information (optional, command 0x2B)
+            // Get tag UID for addressed commands
+            byte[] uid = tag.getId();
+
+            // Try to get system information first (optional, command 0x2B)
+            int blockSize = 4; // Default block size for most ISO 15693 tags
+            int numBlocks = 256; // Default max, will be limited by actual read attempts
+
             try {
                 byte[] getSystemInfoCmd = new byte[10];
                 getSystemInfoCmd[0] = 0x22; // Flags: addressed, high data rate
@@ -764,11 +769,19 @@ public class CapacitorNfcPlugin extends Plugin {
 
                 byte[] systemInfo = nfcV.transceive(getSystemInfoCmd);
                 if (systemInfo != null && systemInfo.length >= 2 && (systemInfo[0] & 0x01) == 0) {
+                    // Parse system info response
                     int infoFlags = systemInfo[1] & 0xFF;
-                    int offset = 10;
+                    int offset = 10; // Skip flags + UID
 
-                    if ((infoFlags & 0x01) != 0) offset++;
-                    if ((infoFlags & 0x02) != 0) offset++;
+                    // Check if DSFID is present (bit 0 of info flags)
+                    if ((infoFlags & 0x01) != 0) {
+                        offset++;
+                    }
+                    // Check if AFI is present (bit 1 of info flags)
+                    if ((infoFlags & 0x02) != 0) {
+                        offset++;
+                    }
+                    // Check if memory size is present (bit 2 of info flags)
                     if ((infoFlags & 0x04) != 0 && systemInfo.length > offset + 1) {
                         numBlocks = (systemInfo[offset] & 0xFF) + 1;
                         blockSize = (systemInfo[offset + 1] & 0x1F) + 1;
@@ -779,15 +792,21 @@ public class CapacitorNfcPlugin extends Plugin {
             }
 
             // Read blocks to find and parse NDEF TLV
+            // Type 5 tags store NDEF in CC (Capability Container) + NDEF TLV format
+            // CC is in block 0, NDEF starts after
+
+            // Read first blocks to get CC and find NDEF
             byte[] allData = new byte[numBlocks * blockSize];
             int bytesRead = 0;
-            int maxBlocksToRead = Math.min(numBlocks, 64);
+            int maxBlocksToRead = Math.min(numBlocks, 64); // Limit initial read
 
             for (int block = 0; block < maxBlocksToRead; block++) {
                 try {
+                    // READ_SINGLE_BLOCK command (addressed mode)
                     byte[] readCmd = new byte[11];
-                    readCmd[0] = 0x22;
-                    readCmd[1] = 0x20;
+                    readCmd[0] = 0x22; // Flags: addressed, high data rate
+                    readCmd[1] = 0x20; // READ_SINGLE_BLOCK command
+                    // Copy UID in reverse order
                     for (int i = 0; i < 8; i++) {
                         readCmd[2 + i] = uid[7 - i];
                     }
@@ -796,13 +815,16 @@ public class CapacitorNfcPlugin extends Plugin {
                     byte[] response = nfcV.transceive(readCmd);
 
                     if (response != null && response.length > 1 && (response[0] & 0x01) == 0) {
+                        // Skip response flags byte, copy block data
                         int dataLen = Math.min(response.length - 1, blockSize);
                         System.arraycopy(response, 1, allData, bytesRead, dataLen);
                         bytesRead += dataLen;
                     } else {
+                        // Error response or no more blocks
                         break;
                     }
                 } catch (IOException e) {
+                    // Block read failed, stop reading
                     break;
                 }
             }
@@ -810,22 +832,24 @@ public class CapacitorNfcPlugin extends Plugin {
             nfcV.close();
 
             if (bytesRead < 4) {
+                Log.w(TAG, "NfcV: Not enough data read from tag");
                 return null;
             }
 
-            // Parse Capability Container (first 4 bytes)
-            // CC[0] = Magic number (0xE1 for NFC Forum Type 5, 0xE2 for extended)
+            // Parse Capability Container (first 4 bytes typically)
+            // CC[0] = Magic number (0xE1 for NFC Forum Type 5)
             // CC[1] = Version + access conditions
             // CC[2] = Memory size / 8
             // CC[3] = Feature flags
+
             int ccMagic = allData[0] & 0xFF;
             if (ccMagic != 0xE1 && ccMagic != 0xE2) {
-                // Not an NDEF formatted tag
+                // Not an NDEF formatted tag, but still emit the raw tag info
                 return null;
             }
 
-            // Find NDEF TLV starting after CC
-            int tlvOffset = 4;
+            // Find NDEF TLV (Type = 0x03) starting after CC
+            int tlvOffset = 4; // CC is typically 4 bytes
             int ndefLength = 0;
             int ndefDataOffset = 0;
 
@@ -833,20 +857,27 @@ public class CapacitorNfcPlugin extends Plugin {
                 int tlvType = allData[tlvOffset] & 0xFF;
 
                 if (tlvType == 0x00) {
+                    // NULL TLV, skip
                     tlvOffset++;
+                    continue;
                 } else if (tlvType == 0xFE) {
+                    // Terminator TLV
                     break;
                 } else if (tlvType == 0x03) {
+                    // NDEF Message TLV found
                     if ((allData[tlvOffset + 1] & 0xFF) == 0xFF) {
+                        // 3-byte length format
                         if (tlvOffset + 3 >= bytesRead) break;
                         ndefLength = ((allData[tlvOffset + 2] & 0xFF) << 8) | (allData[tlvOffset + 3] & 0xFF);
                         ndefDataOffset = tlvOffset + 4;
                     } else {
+                        // 1-byte length format
                         ndefLength = allData[tlvOffset + 1] & 0xFF;
                         ndefDataOffset = tlvOffset + 2;
                     }
                     break;
                 } else {
+                    // Other TLV, skip it
                     int skipLen;
                     if ((allData[tlvOffset + 1] & 0xFF) == 0xFF) {
                         if (tlvOffset + 3 >= bytesRead) break;
@@ -860,14 +891,30 @@ public class CapacitorNfcPlugin extends Plugin {
             }
 
             if (ndefLength == 0 || ndefDataOffset + ndefLength > bytesRead) {
+                // NfcV: No valid NDEF TLV found or data incomplete
                 return null;
             }
 
+            // Extract NDEF message data
             byte[] ndefData = new byte[ndefLength];
             System.arraycopy(allData, ndefDataOffset, ndefData, 0, ndefLength);
 
-            return new NdefMessage(ndefData);
-        } catch (SecurityException | IOException | FormatException e) {
+            try {
+                NdefMessage message = new NdefMessage(ndefData);
+                return message;
+            } catch (FormatException e) {
+                Log.w(TAG, "NfcV: Failed to parse NDEF message", e);
+                return null;
+            }
+        } catch (SecurityException e) {
+            try {
+                nfcV.close();
+            } catch (Exception closeEx) {
+                // Ignore
+            }
+            return null;
+        } catch (IOException e) {
+            Log.w(TAG, "NfcV: IO error reading tag", e);
             try {
                 nfcV.close();
             } catch (IOException closeEx) {
