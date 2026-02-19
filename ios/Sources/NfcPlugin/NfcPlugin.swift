@@ -566,10 +566,10 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
     /// Process ISO 15693 tags - these tags may not support NDEF, so we emit tag info with UID
     private func processISO15693Tag(_ tag: NFCISO15693Tag, session: NFCTagReaderSession) {
         // First try to query NDEF status - some ISO15693 tags support NDEF
-        tag.queryNDEFStatus { [weak self] status, _, _ in
+        tag.queryNDEFStatus { [weak self] status, _, error in
             guard let self else { return }
 
-            if let error {
+            if error != nil {
                 // Tag doesn't support NDEF, emit tag info with UID
                 self.emitISO15693TagEvent(tag: tag, message: nil, session: session)
                 return
