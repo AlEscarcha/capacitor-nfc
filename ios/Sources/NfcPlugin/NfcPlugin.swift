@@ -566,17 +566,17 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
     /// Process ISO 15693 tags - these tags may not support NDEF, so we emit tag info with UID
     private func processISO15693Tag(_ tag: NFCISO15693Tag, session: NFCTagReaderSession) {
         // First try to query NDEF status - some ISO15693 tags support NDEF
-        tag.queryNDEFStatus { [weak self] status, _, error in
+        tag.queryNDEFStatus { [weak self] status, capacity, error in
             guard let self else { return }
 
             if error != nil {
                 // Tag doesn't support NDEF, emit tag info with UID
-                self.emitISO15693TagEvent(tag: tag, message: nil, session: session)
+                self.emitISO15693TagEvent(tag: tag, status: .notSupported, capacity: 0, message: nil, session: session)
                 return
             }
 
             if status == .notSupported {
-                self.emitISO15693TagEvent(tag: tag, message: nil, session: session)
+                self.emitISO15693TagEvent(tag: tag, status: status, capacity: capacity, message: nil, session: session)
                 return
             }
 
@@ -586,17 +586,17 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
 
                 if readError != nil {
                     // Failed to read NDEF, still emit tag with UID
-                    self.emitISO15693TagEvent(tag: tag, message: nil, session: session)
+                    self.emitISO15693TagEvent(tag: tag, status: status, capacity: capacity, message: nil, session: session)
                     return
                 }
 
-                self.emitISO15693TagEvent(tag: tag, message: message, session: session)
+                self.emitISO15693TagEvent(tag: tag, status: status, capacity: capacity, message: message, session: session)
             }
         }
     }
 
     /// Emit event for ISO 15693 tag
-    private func emitISO15693TagEvent(tag: NFCISO15693Tag, message: NFCNDEFMessage?, session: NFCTagReaderSession) {
+    private func emitISO15693TagEvent(tag: NFCISO15693Tag, status: NFCNDEFStatus, capacity: Int, message: NFCNDEFMessage?, session: NFCTagReaderSession) {
         var tagInfo: [String: Any] = [:]
 
         // Add the tag ID (UID)
@@ -605,9 +605,10 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
         tagInfo["type"] = "ISO 15693"
         tagInfo["icManufacturerCode"] = tag.icManufacturerCode
         tagInfo["icSerialNumber"] = array(from: tag.icSerialNumber)
+        tagInfo["isWritable"] = status == .readWrite
+        tagInfo["maxSize"] = capacity
 
         if let message {
-            tagInfo["isWritable"] = true
             tagInfo["ndefMessage"] = message.records.map { record in
                 [
                     "tnf": NSNumber(value: record.typeNameFormat.rawValue),
@@ -647,7 +648,7 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
 
                     if message == nil {
                         // NDEF read failed, still emit tag with UID
-                        self.emitTagEvent(tag: tag, message: nil, session: session)
+                        self.emitTagEvent(tag: tag, status: status, capacity: capacity, message: nil, session: session)
                     } else {
                         // Successfully read NDEF
                         self.currentTag = tag
@@ -661,12 +662,12 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
                 }
             } else {
                 // Tag doesn't support NDEF or query failed - just emit UID
-                self.emitTagEvent(tag: tag, message: nil, session: session)
+                self.emitTagEvent(tag: tag, status: .notSupported, capacity: 0, message: nil, session: session)
             }
         }
     }
 
-    private func emitTagEvent(tag: NFCNDEFTag, message: NFCNDEFMessage?, session: NFCTagReaderSession) {
+    private func emitTagEvent(tag: NFCNDEFTag, status: NFCNDEFStatus, capacity: Int, message: NFCNDEFMessage?, session: NFCTagReaderSession) {
         // Save the current tag for writing
         currentTag = tag
 
@@ -679,9 +680,10 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
         
         tagInfo["techTypes"] = detectTechTypes(for: tag)
         tagInfo["type"] = translateType(for: tag)
+        tagInfo["isWritable"] = status == .readWrite
+        tagInfo["maxSize"] = capacity
 
         if let message {
-            tagInfo["isWritable"] = true
             tagInfo["ndefMessage"] = message.records.map { record in
                 [
                     "tnf": NSNumber(value: record.typeNameFormat.rawValue),

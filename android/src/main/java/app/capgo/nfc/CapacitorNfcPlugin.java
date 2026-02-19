@@ -604,6 +604,7 @@ public class CapacitorNfcPlugin extends Plugin {
                 if (evenMorePages != null && evenMorePages.length > 0) {
                     System.arraycopy(evenMorePages, 0, allData, bytesRead, Math.min(evenMorePages.length, allData.length - bytesRead));
                     bytesRead += Math.min(evenMorePages.length, allData.length - bytesRead);
+                    currentPage = 16;
                 }
             } catch (IOException e) {
                 // Tag might not support reading beyond page 11
