@@ -566,7 +566,7 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
     /// Process ISO 15693 tags - these tags may not support NDEF, so we emit tag info with UID
     private func processISO15693Tag(_ tag: NFCISO15693Tag, session: NFCTagReaderSession) {
         // First try to query NDEF status - some ISO15693 tags support NDEF
-        tag.queryNDEFStatus { [weak self] status, capacity, error in
+        tag.queryNDEFStatus { [weak self] status, _, _ in
             guard let self else { return }
 
             if let error {
@@ -676,7 +676,7 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
         if let identifierData = extractIdentifier(from: tag) {
             tagInfo["id"] = array(from: identifierData)
         }
-
+        
         tagInfo["techTypes"] = detectTechTypes(for: tag)
         tagInfo["type"] = translateType(for: tag)
 
@@ -709,4 +709,3 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
 enum NfcPluginError: Error {
     case invalidPayload
 }
-

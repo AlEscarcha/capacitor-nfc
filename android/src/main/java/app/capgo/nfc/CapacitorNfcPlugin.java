@@ -341,7 +341,9 @@ public class CapacitorNfcPlugin extends Plugin {
                     } else {
                         // Check if this is an ISO 15693 (NfcV) tag which typically doesn't support NDEF
                         if (hasNfcV) {
-                            call.reject("This ISO 15693 tag does not support NDEF. These raw tags can only be read, not written with NDEF messages.");
+                            call.reject(
+                                "This ISO 15693 tag does not support NDEF. These raw tags can only be read, not written with NDEF messages."
+                            );
                         } else {
                             call.reject("Tag does not support NDEF formatting. Tech types: " + Arrays.toString(techList));
                         }
@@ -424,7 +426,6 @@ public class CapacitorNfcPlugin extends Plugin {
 
             mifare.close();
             return true;
-
         } catch (IOException e) {
             Log.w(TAG, "MIFARE Ultralight write failed", e);
             try {
@@ -602,8 +603,7 @@ public class CapacitorNfcPlugin extends Plugin {
             try {
                 byte[] evenMorePages = mifare.readPages(12);
                 if (evenMorePages != null && evenMorePages.length > 0) {
-                    System.arraycopy(evenMorePages, 0, allData, bytesRead,
-                        Math.min(evenMorePages.length, allData.length - bytesRead));
+                    System.arraycopy(evenMorePages, 0, allData, bytesRead, Math.min(evenMorePages.length, allData.length - bytesRead));
                     bytesRead += Math.min(evenMorePages.length, allData.length - bytesRead);
                 }
             } catch (IOException e) {
@@ -698,9 +698,16 @@ public class CapacitorNfcPlugin extends Plugin {
             mifare.close();
 
             if (bytesRead < totalBytesNeeded) {
-                Log.w(TAG, String.format(
-                    "Incomplete NDEF read: read %d bytes, needed %d bytes (stopped at page %d, variant: %s)",
-                    bytesRead, totalBytesNeeded, currentPage, variantName));
+                Log.w(
+                    TAG,
+                    String.format(
+                        "Incomplete NDEF read: read %d bytes, needed %d bytes (stopped at page %d, variant: %s)",
+                        bytesRead,
+                        totalBytesNeeded,
+                        currentPage,
+                        variantName
+                    )
+                );
                 return null;
             }
 
@@ -714,7 +721,6 @@ public class CapacitorNfcPlugin extends Plugin {
                 Log.w(TAG, "Failed to parse NDEF message from MIFARE Ultralight", e);
                 return null;
             }
-
         } catch (SecurityException | IOException e) {
             try {
                 mifare.close();
@@ -861,7 +867,6 @@ public class CapacitorNfcPlugin extends Plugin {
             System.arraycopy(allData, ndefDataOffset, ndefData, 0, ndefLength);
 
             return new NdefMessage(ndefData);
-
         } catch (SecurityException | IOException | FormatException e) {
             try {
                 nfcV.close();
@@ -1034,4 +1039,3 @@ public class CapacitorNfcPlugin extends Plugin {
         void onStateChanged(int state);
     }
 }
-

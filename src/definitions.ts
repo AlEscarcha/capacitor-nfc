@@ -24,7 +24,6 @@ export type NfcEventType = 'tag' | 'ndef' | 'ndef-mime' | 'ndef-formatable';
  */
 export type IosPollingOption = 'iso14443' | 'iso15693' | 'iso18092';
 
-
 /**
  * JSON structure representing a single NDEF record.
  *
