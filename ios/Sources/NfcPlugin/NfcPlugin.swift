@@ -536,14 +536,17 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
 
             if error == nil && status != .notSupported {
                 // Tag supports NDEF, try to read it
-                tag.readNDEF { [weak self] message, _ in
+                tag.readNDEF { [weak self] message, readError in
                     guard let self else {
                         return
                     }
 
+                    // For blank/formatted tags that are writable but have no NDEF message yet,
+                    // readNDEF may return nil message without an error, or return an error.
+                    // We should emit the tag with its UID and writability info.
                     if message == nil {
-                        // NDEF read failed, still emit tag with UID
-                        self.emitTagEvent(tag: tag, message: nil, session: session)
+                        // Blank tag or NDEF read failed - emit tag with UID and status info
+                        self.emitTagEvent(tag: tag, status: status, capacity: capacity, message: nil, session: session)
                     } else {
                         // Successfully read NDEF
                         self.currentTag = tag
@@ -556,12 +559,12 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
                 }
             } else {
                 // Tag doesn't support NDEF or query failed - just emit UID
-                self.emitTagEvent(tag: tag, message: nil, session: session)
+                self.emitTagEvent(tag: tag, status: .notSupported, capacity: 0, message: nil, session: session)
             }
         }
     }
 
-    private func emitTagEvent(tag: NFCNDEFTag, message: NFCNDEFMessage?, session: NFCTagReaderSession) {
+    private func emitTagEvent(tag: NFCNDEFTag, status: NFCNDEFStatus, capacity: Int, message: NFCNDEFMessage?, session: NFCTagReaderSession) {
         // Save the current tag for writing
         currentTag = tag
 
@@ -574,9 +577,14 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
         
         tagInfo["techTypes"] = detectTechTypes(for: tag)
         tagInfo["type"] = translateType(for: tag)
+        
+        // Include writability and capacity information
+        if status != .notSupported {
+            tagInfo["isWritable"] = status == .readWrite
+            tagInfo["maxSize"] = capacity
+        }
 
         if let message {
-            tagInfo["isWritable"] = true
             tagInfo["ndefMessage"] = message.records.map { record in
                 [
                     "tnf": NSNumber(value: record.typeNameFormat.rawValue),
